@@ -108,13 +108,12 @@ class RetroDialer @JvmOverloads constructor(
             drawBorderAndDecoratorCircle()
 
             nextHoleInCircle(internalCanvas, (150 + dialerRotatedAngle).toDouble(), holePaint, 1)
-            internalCanvas.drawRoundRect((finalWidth - mainCircleRadius / 2),
-                (finalHeight / 2 - 8f),
-                finalWidth.toFloat(),
-                (finalHeight / 2 + 8f),
-                2f,
-                2f,
-                dialerLinePaint)
+            internalCanvas.drawCircle(
+                xCenterOfParentCircle + (finalWidth - 2*(TEXT_INSET_FROM_BORDER + HOLE_RADIUS))/2,
+                finalHeight/2f,
+                HOLE_RADIUS * 0.75f,
+                dialerLinePaint
+            )
 
             canvas.drawBitmap(internalBitmap, 0f, 0f, null)
 
