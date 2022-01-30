@@ -23,15 +23,25 @@ class RetroDialer @JvmOverloads constructor(
         private const val HOLE_RADIUS = 40f
     }
 
+    private var onCodeCompleteListener: ((String) -> Unit)? = null
 
     private var finalWidth: Int = 0
     private var finalHeight: Int = 0
+
+    private var codeGeneratedTillNow: String = ""
 
     private val xCenterOfParentCircle: Float get() = finalWidth/2f
     private val yCenterOfParentCircle: Float get() = finalHeight/2f
     private val mainCircleRadius: Float get() = min(finalHeight, finalWidth)/2f
 
     private var dialerRotatedAngle = 0
+
+    private var maxCodeLength: Int = 4
+
+    private val angleToNumberMap = mutableMapOf<Int, Int>()
+    init {
+        setupAngleToNumberMap()
+    }
 
     private val mainCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
@@ -42,7 +52,7 @@ class RetroDialer @JvmOverloads constructor(
     }
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.BLACK
+        color = Color.WHITE
         textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 20f, resources.displayMetrics)
     }
 
@@ -52,6 +62,10 @@ class RetroDialer @JvmOverloads constructor(
 
     private val internalCanvas: Canvas by lazy {
         Canvas(internalBitmap)
+    }
+
+    private val dialerLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.GRAY
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -72,22 +86,50 @@ class RetroDialer @JvmOverloads constructor(
         setMeasuredDimension(finalWidth, finalHeight)
     }
 
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.BLACK
+        style = Paint.Style.STROKE
+        strokeWidth = 14f
+        isDither = true
+    }
+
     override fun onDraw(canvas: Canvas?) {
         super.onDraw(canvas)
         canvas?.let {
 
-            mainCirclePaint.color = Color.WHITE
-            canvas.drawCircle(xCenterOfParentCircle, yCenterOfParentCircle, mainCircleRadius, mainCirclePaint)
-            printTextOnDialer(it, 180.toDouble(), textPaint, 1)
+            drawBaseCircle(it)
+            printTextOnDialer(it, 150.toDouble(), textPaint, 1)
 
-            mainCirclePaint.color = Color.RED
-            internalCanvas.drawCircle(xCenterOfParentCircle, yCenterOfParentCircle, mainCircleRadius, mainCirclePaint)
+            drawBorderAndDecoratorCircle(it)
 
-            nextHoleInCircle(internalCanvas, (180 + dialerRotatedAngle).toDouble(), holePaint, 1)
+            nextHoleInCircle(internalCanvas, (150 + dialerRotatedAngle).toDouble(), holePaint, 1)
+            internalCanvas.drawRoundRect((finalWidth - mainCircleRadius/2), (finalHeight/2 - 8f), finalWidth.toFloat(), (finalHeight/2 + 8f), 2f, 2f, dialerLinePaint)
 
             canvas.drawBitmap(internalBitmap, 0f, 0f, null)
 
         }
+    }
+
+    private fun drawBaseCircle(canvas: Canvas) {
+        mainCirclePaint.color = Color.BLACK
+        canvas.drawCircle(xCenterOfParentCircle, yCenterOfParentCircle, mainCircleRadius, mainCirclePaint)
+    }
+
+    private fun drawBorderAndDecoratorCircle(canvas: Canvas) {
+        mainCirclePaint.color = Color.WHITE
+        internalCanvas.drawCircle(xCenterOfParentCircle, yCenterOfParentCircle, mainCircleRadius, mainCirclePaint)
+        borderPaint.apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 14f
+            isDither = true
+        }
+        internalCanvas.drawCircle(xCenterOfParentCircle, yCenterOfParentCircle, mainCircleRadius-7, borderPaint)
+        borderPaint.apply {
+            style = Paint.Style.FILL_AND_STROKE
+        }
+        val innerCircleRadius = mainCircleRadius - 2* TEXT_INSET_FROM_BORDER - 2* HOLE_RADIUS
+        internalCanvas.drawCircle(xCenterOfParentCircle, yCenterOfParentCircle, innerCircleRadius, borderPaint)
     }
 
     private fun nextHoleInCircle(holeCanvas: Canvas, angle: Double, paint: Paint, count: Int) {
@@ -123,7 +165,7 @@ class RetroDialer @JvmOverloads constructor(
         val angle = atan(tanTheta.toDouble())
 
         val pureRotation = Math.toDegrees(angle).toInt()
-        if ((abs(dialerRotatedAngle + pureRotation) >= 340) || dialerRotatedAngle + pureRotation >= 0) {
+        if ((abs(dialerRotatedAngle + pureRotation) >= 335) || dialerRotatedAngle + pureRotation >= 0) {
             return
         }
         dialerRotatedAngle += pureRotation
@@ -149,6 +191,7 @@ class RetroDialer @JvmOverloads constructor(
                 true
             }
             MotionEvent.ACTION_UP -> {
+                addLastNumberToCodeTillNow()
                 reverse()
                 true
             }
@@ -165,6 +208,32 @@ class RetroDialer @JvmOverloads constructor(
             }
             start()
         }
+    }
+
+    private fun setupAngleToNumberMap() {
+        (0..9).forEach { number ->
+            val idealAngle = 60 + number * 30
+            angleToNumberMap[idealAngle] = number
+        }
+    }
+
+    private fun addLastNumberToCodeTillNow() {
+        val totalAngleRevolved = abs(dialerRotatedAngle)
+        for (idealAngle in angleToNumberMap.keys) {
+            if (totalAngleRevolved <= idealAngle+10 && totalAngleRevolved >= idealAngle-10) {
+                codeGeneratedTillNow += (angleToNumberMap[idealAngle]).toString()
+                Log.d("CodeGenerated", "code: $codeGeneratedTillNow")
+                break
+            }
+        }
+        if (codeGeneratedTillNow.length == maxCodeLength) {
+            onCodeCompleteListener?.invoke(codeGeneratedTillNow)
+            codeGeneratedTillNow = ""
+        }
+    }
+
+    fun setOnCodeCompleteListener(listener: (String) -> Unit) {
+        onCodeCompleteListener = listener
     }
 
 }
