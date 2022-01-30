@@ -13,14 +13,15 @@ import kotlin.math.*
 
 class RetroDialer @JvmOverloads constructor(
     context: Context,
-    attrs: AttributeSet? = null,
-    defStyleAttr: Int = 0
+    private val attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0,
 ) : View(context, attrs, defStyleAttr) {
 
     companion object {
         private const val DEFAULT_DIMENSION = 600
         private const val TEXT_INSET_FROM_BORDER = 40f
         private const val HOLE_RADIUS = 40f
+        private const val DEFAULT_PIN_MIN_LENGTH = 4
     }
 
     private var onCodeCompleteListener: ((String) -> Unit)? = null
@@ -30,17 +31,19 @@ class RetroDialer @JvmOverloads constructor(
 
     private var codeGeneratedTillNow: String = ""
 
-    private val xCenterOfParentCircle: Float get() = finalWidth/2f
-    private val yCenterOfParentCircle: Float get() = finalHeight/2f
-    private val mainCircleRadius: Float get() = min(finalHeight, finalWidth)/2f
+    private val xCenterOfParentCircle: Float get() = finalWidth / 2f
+    private val yCenterOfParentCircle: Float get() = finalHeight / 2f
+    private val mainCircleRadius: Float get() = min(finalHeight, finalWidth) / 2f
 
     private var dialerRotatedAngle = 0
 
-    private var maxCodeLength: Int = 4
+    private var maxCodeLength: Int = DEFAULT_PIN_MIN_LENGTH
 
     private val angleToNumberMap = mutableMapOf<Int, Int>()
+
     init {
         setupAngleToNumberMap()
+        setupMinPinLength()
     }
 
     private val mainCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -53,7 +56,9 @@ class RetroDialer @JvmOverloads constructor(
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
-        textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 20f, resources.displayMetrics)
+        textSize =
+            TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 20f, resources.displayMetrics)
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
 
     private val internalBitmap: Bitmap by lazy {
@@ -68,29 +73,29 @@ class RetroDialer @JvmOverloads constructor(
         color = Color.GRAY
     }
 
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-
-        val parentWidth = MeasureSpec.getSize(widthMeasureSpec)
-        val parentHeight = MeasureSpec.getSize(heightMeasureSpec)
-
-        finalWidth = when(MeasureSpec.getMode(widthMeasureSpec)) {
-            MeasureSpec.EXACTLY -> parentWidth
-            else -> DEFAULT_DIMENSION
-        }
-
-        finalHeight = when(MeasureSpec.getMode(heightMeasureSpec)) {
-            MeasureSpec.EXACTLY -> parentHeight
-            else -> DEFAULT_DIMENSION
-        }
-
-        setMeasuredDimension(finalWidth, finalHeight)
-    }
-
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
         style = Paint.Style.STROKE
         strokeWidth = 14f
         isDither = true
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+
+        val parentWidth = MeasureSpec.getSize(widthMeasureSpec)
+        val parentHeight = MeasureSpec.getSize(heightMeasureSpec)
+
+        finalWidth = when (MeasureSpec.getMode(widthMeasureSpec)) {
+            MeasureSpec.EXACTLY -> parentWidth
+            else -> DEFAULT_DIMENSION
+        }
+
+        finalHeight = when (MeasureSpec.getMode(heightMeasureSpec)) {
+            MeasureSpec.EXACTLY -> parentHeight
+            else -> DEFAULT_DIMENSION
+        }
+
+        setMeasuredDimension(finalWidth, finalHeight)
     }
 
     override fun onDraw(canvas: Canvas?) {
@@ -100,10 +105,16 @@ class RetroDialer @JvmOverloads constructor(
             drawBaseCircle(it)
             printTextOnDialer(it, 150.toDouble(), textPaint, 1)
 
-            drawBorderAndDecoratorCircle(it)
+            drawBorderAndDecoratorCircle()
 
             nextHoleInCircle(internalCanvas, (150 + dialerRotatedAngle).toDouble(), holePaint, 1)
-            internalCanvas.drawRoundRect((finalWidth - mainCircleRadius/2), (finalHeight/2 - 8f), finalWidth.toFloat(), (finalHeight/2 + 8f), 2f, 2f, dialerLinePaint)
+            internalCanvas.drawRoundRect((finalWidth - mainCircleRadius / 2),
+                (finalHeight / 2 - 8f),
+                finalWidth.toFloat(),
+                (finalHeight / 2 + 8f),
+                2f,
+                2f,
+                dialerLinePaint)
 
             canvas.drawBitmap(internalBitmap, 0f, 0f, null)
 
@@ -112,24 +123,44 @@ class RetroDialer @JvmOverloads constructor(
 
     private fun drawBaseCircle(canvas: Canvas) {
         mainCirclePaint.color = Color.BLACK
-        canvas.drawCircle(xCenterOfParentCircle, yCenterOfParentCircle, mainCircleRadius, mainCirclePaint)
+        canvas.drawCircle(
+            xCenterOfParentCircle,
+            yCenterOfParentCircle,
+            mainCircleRadius,
+            mainCirclePaint
+        )
     }
 
-    private fun drawBorderAndDecoratorCircle(canvas: Canvas) {
+    private fun drawBorderAndDecoratorCircle() {
         mainCirclePaint.color = Color.WHITE
-        internalCanvas.drawCircle(xCenterOfParentCircle, yCenterOfParentCircle, mainCircleRadius, mainCirclePaint)
+        internalCanvas.drawCircle(
+            xCenterOfParentCircle,
+            yCenterOfParentCircle,
+            mainCircleRadius,
+            mainCirclePaint
+        )
         borderPaint.apply {
             color = Color.BLACK
             style = Paint.Style.STROKE
             strokeWidth = 14f
             isDither = true
         }
-        internalCanvas.drawCircle(xCenterOfParentCircle, yCenterOfParentCircle, mainCircleRadius-7, borderPaint)
+        internalCanvas.drawCircle(
+            xCenterOfParentCircle,
+            yCenterOfParentCircle,
+            mainCircleRadius - 7,
+            borderPaint
+        )
         borderPaint.apply {
             style = Paint.Style.FILL_AND_STROKE
         }
-        val innerCircleRadius = mainCircleRadius - 2* TEXT_INSET_FROM_BORDER - 2* HOLE_RADIUS
-        internalCanvas.drawCircle(xCenterOfParentCircle, yCenterOfParentCircle, innerCircleRadius, borderPaint)
+        val innerCircleRadius = mainCircleRadius - 2 * TEXT_INSET_FROM_BORDER - 2 * HOLE_RADIUS
+        internalCanvas.drawCircle(
+            xCenterOfParentCircle,
+            yCenterOfParentCircle,
+            innerCircleRadius,
+            borderPaint
+        )
     }
 
     private fun nextHoleInCircle(holeCanvas: Canvas, angle: Double, paint: Paint, count: Int) {
@@ -141,7 +172,7 @@ class RetroDialer @JvmOverloads constructor(
 
         holeCanvas.drawCircle(newX, newY, HOLE_RADIUS, paint)
 
-        nextHoleInCircle(holeCanvas, angle+30, paint, count+1)
+        nextHoleInCircle(holeCanvas, angle + 30, paint, count + 1)
     }
 
     private fun printTextOnDialer(textCanvas: Canvas, angle: Double, paint: Paint, count: Int) {
@@ -151,16 +182,16 @@ class RetroDialer @JvmOverloads constructor(
         val newX = (radius * sin(Math.toRadians(angle))).toFloat() + xCenterOfParentCircle
         val newY = (radius * cos(Math.toRadians(angle))).toFloat() + yCenterOfParentCircle
 
-        textCanvas.drawText((count-1).toString(), newX-10, newY+5, paint)
+        textCanvas.drawText((count - 1).toString(), newX - 10, newY + 5, paint)
 
-        printTextOnDialer(textCanvas, angle+30, paint, count+1)
+        printTextOnDialer(textCanvas, angle + 30, paint, count + 1)
     }
 
     private fun angleBetweenTwoLines(x1: Float, y1: Float, x2: Float, y2: Float) {
         val m1 = (y2 - yCenterOfParentCircle) / (x2 - xCenterOfParentCircle)
         val m2 = (y1 - yCenterOfParentCircle) / (x1 - xCenterOfParentCircle)
 
-        val tanTheta = (m2 - m1) / (1 + m1*m2)
+        val tanTheta = (m2 - m1) / (1 + m1 * m2)
 
         val angle = atan(tanTheta.toDouble())
 
@@ -180,7 +211,7 @@ class RetroDialer @JvmOverloads constructor(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent?): Boolean {
-        return when(event?.action) {
+        return when (event?.action) {
             MotionEvent.ACTION_DOWN -> {
                 dx = event.x
                 dy = event.y
@@ -217,10 +248,28 @@ class RetroDialer @JvmOverloads constructor(
         }
     }
 
+    private fun setupMinPinLength() {
+        context.theme.obtainStyledAttributes(
+            attrs,
+            R.styleable.RetroDialer,
+            0, 0
+        ).apply {
+            try {
+                val pinLengthSpecified =
+                    getInteger(R.styleable.RetroDialer_maxPinCount, DEFAULT_PIN_MIN_LENGTH)
+                if (pinLengthSpecified > 0) {
+                    maxCodeLength = pinLengthSpecified
+                }
+            } finally {
+                recycle()
+            }
+        }
+    }
+
     private fun addLastNumberToCodeTillNow() {
         val totalAngleRevolved = abs(dialerRotatedAngle)
         for (idealAngle in angleToNumberMap.keys) {
-            if (totalAngleRevolved <= idealAngle+10 && totalAngleRevolved >= idealAngle-10) {
+            if (totalAngleRevolved <= idealAngle + 10 && totalAngleRevolved >= idealAngle - 10) {
                 codeGeneratedTillNow += (angleToNumberMap[idealAngle]).toString()
                 Log.d("CodeGenerated", "code: $codeGeneratedTillNow")
                 break
